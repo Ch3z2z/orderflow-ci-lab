@@ -63,3 +63,25 @@ def test_audit_log_redacts_sensitive_fields(caplog):
     assert "p@ss" not in logged and "t-1" not in logged and "a@test.local" not in logged
     assert '"user_id": 7' in logged
     assert event["attributes"]["password"] == "p@ss"
+
+
+def _request(handler_cls, path):
+    import io
+    handler = handler_cls.__new__(handler_cls)
+    handler.path = path
+    handler.request_version = "HTTP/1.1"
+    handler.requestline = "GET " + path + " HTTP/1.1"
+    handler.command = "GET"
+    handler.wfile = io.BytesIO()
+    handler.log_message = lambda *args: None
+    handler.do_GET()
+    return handler.wfile.getvalue().decode("utf-8")
+
+
+def test_response_has_no_implementation_banner():
+    import json
+    from orderflow.web import Handler
+    raw = _request(Handler, "/health")
+    headers, body = raw.split("\r\n\r\n", 1)
+    assert "X-Powered-By" not in headers
+    assert json.loads(body) == {"status": "ok"}
