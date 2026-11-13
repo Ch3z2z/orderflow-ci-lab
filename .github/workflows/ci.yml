@@ -3,7 +3,7 @@ name: Code quality and security
 on:
   workflow_dispatch:
   push:
-    branches: [main, "student/**"]
+    branches: [main, "student/**", "audit/**"]
   pull_request:
     branches: [main]
 
@@ -14,19 +14,53 @@ jobs:
   tests:
     name: Unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install pytest
-      - run: python -m pytest -q
+      - run: python -m pip install 'pytest>=8,<10'
+      - name: Run unit tests with JUnit report
+        run: |
+          mkdir -p reports
+          python -m pytest -q --junitxml=reports/pytest.xml
+      - name: Check that JUnit report exists
+        if: always()
+        run: test -s reports/pytest.xml
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-junit
+          path: reports/pytest.xml
+          if-no-files-found: error
+          retention-days: 14
+
+  regression:
+    name: Business invariant regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'pytest>=8,<10'
+      - run: python -m pytest -q tests/test_regression_invariants.py tests/test_security_fixes.py
 
   quality:
     name: Ruff quality gate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -36,10 +70,15 @@ jobs:
   security:
     name: Semgrep security gate
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: python -m pip install 'semgrep>=1.100,<2'
+      - name: Self-test Semgrep rules on annotated fixture
+        run: semgrep scan --test --metrics=off rules/
       - run: semgrep scan --config rules/orderflow.yml --error --metrics=off src
