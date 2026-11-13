@@ -31,7 +31,7 @@ def apply_promotions(subtotal: int, codes: list[str], categories: Iterable[str])
     applied = []
     for code in codes:
         rule = eligible.get(code.upper())
-        if rule is None:
+        if rule is None or rule.code in applied:
             continue
         result *= Decimal(100 - rule.percent) / Decimal(100)
         applied.append(rule.code)
