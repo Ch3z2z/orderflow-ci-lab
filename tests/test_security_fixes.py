@@ -85,3 +85,44 @@ def test_response_has_no_implementation_banner():
     headers, body = raw.split("\r\n\r\n", 1)
     assert "X-Powered-By" not in headers
     assert json.loads(body) == {"status": "ok"}
+
+
+def test_read_document_stays_inside_root(tmp_path):
+    import pytest
+    from orderflow.imports import read_document
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "a.txt").write_text("ok", encoding="utf-8")
+    (tmp_path.parent / "outside.txt").write_text("secret", encoding="utf-8")
+    assert read_document(str(tmp_path), "docs", "a.txt") == "ok"
+    with pytest.raises(PermissionError):
+        read_document(str(tmp_path), "docs", "../../outside.txt")
+
+
+def _signed(payload, secret="s3cret"):
+    import hashlib
+    import hmac
+    return hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+
+
+def test_payment_callback_requires_valid_signature():
+    from orderflow.billing import Payment, accept_payment_callback
+    payment = Payment(10, 1500, "rub", "ref-1", "captured")
+    payload = b'{"order_id": 10}'
+    assert accept_payment_callback(payment, "RUB", {10}, payload=payload,
+                                   signature=_signed(payload), secret="s3cret")
+    assert not accept_payment_callback(payment, "RUB", {10}, payload=payload,
+                                       signature="forged", secret="s3cret")
+    assert not accept_payment_callback(payment, "RUB", {11}, payload=payload,
+                                       signature=_signed(payload), secret="s3cret")
+    failed = Payment(10, 1500, "RUB", "ref-1", "failed")
+    assert not accept_payment_callback(failed, "RUB", {10}, payload=payload,
+                                       signature=_signed(payload), secret="s3cret")
+
+
+def test_order_search_treats_email_as_data():
+    from orderflow.storage import connect_database, find_orders_by_email, save_order
+    with connect_database() as conn:
+        save_order(conn, "a@test.local", 100)
+        save_order(conn, "b@test.local", 200)
+        assert find_orders_by_email(conn, "x' OR '1'='1") == []
+        assert len(find_orders_by_email(conn, "a@test.local")) == 1
