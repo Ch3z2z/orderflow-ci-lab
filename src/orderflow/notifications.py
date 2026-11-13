@@ -1,5 +1,6 @@
 """Outbound notification preparation and retry bookkeeping."""
 import logging
+from functools import partial
 from urllib.parse import urlparse
 
 LOG = logging.getLogger('orderflow.notifications')
@@ -22,7 +23,8 @@ def retry_delays(attempts: int, base_seconds: int = 2) -> list[int]:
     return [base_seconds * 2 ** attempt for attempt in range(attempts)]
 
 def notify_followers(followers: list[str], reference: str):
-    callbacks = []
-    for follower in followers:
-        callbacks.append(lambda: {'recipient': follower, 'reference': reference})
-    return callbacks
+    return [partial(_follower_notification, follower, reference) for follower in followers]
+
+
+def _follower_notification(recipient: str, reference: str) -> dict:
+    return {'recipient': recipient, 'reference': reference}
