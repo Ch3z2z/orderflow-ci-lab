@@ -3,7 +3,14 @@ rules:
     languages: [python]
     severity: ERROR
     message: "The SQL query includes a dynamic value; keep SQL syntax separate from parameters."
-    pattern: $Q = f"SELECT ..."
+    patterns:
+      - pattern: $Q = $SQL
+      - metavariable-pattern:
+          metavariable: $SQL
+          pattern: f"...{$X}..."
+      - metavariable-regex:
+          metavariable: $SQL
+          regex: (?i)^f["']\s*(SELECT|INSERT|UPDATE|DELETE)\b
   - id: orderflow-user-profile-mass-assignment
     languages: [python]
     severity: ERROR
