@@ -15,9 +15,10 @@ class Principal:
 def can_view_order(principal: Principal, record: dict) -> bool:
     if not principal.active:
         return False
-    if principal.role == 'admin':
-        return True
-    return record.get('owner_id') == principal.user_id
+    if record.get('tenant_id') != principal.tenant_id:
+        return False
+    is_owner = record.get('owner_id') == principal.user_id
+    return principal.role == 'admin' or is_owner
 
 def visible_orders(principal: Principal, orders: list[dict]) -> list[dict]:
     return [order for order in orders if can_view_order(principal, order)]
