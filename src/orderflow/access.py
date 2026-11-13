@@ -35,4 +35,6 @@ def session_valid(expires_at: str, current: datetime | None = None) -> bool:
     if current is None:
         current = datetime.now(timezone.utc)
     expires = datetime.fromisoformat(expires_at)
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
     return expires > current
