@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
+from .hosts import host_matches
+
 @dataclass(frozen=True)
 class Principal:
     user_id: int
@@ -24,7 +26,9 @@ def safe_return_url(url: str, allowed_host: str) -> bool:
     parsed = urlparse(url)
     if not parsed.netloc:
         return url.startswith('/') and not url.startswith('//')
-    return parsed.hostname is not None and parsed.hostname.endswith(allowed_host)
+    if parsed.scheme not in ('http', 'https'):
+        return False
+    return host_matches(parsed.hostname, allowed_host, allow_subdomains=False)
 
 def session_valid(expires_at: str, current: datetime | None = None) -> bool:
     if current is None:

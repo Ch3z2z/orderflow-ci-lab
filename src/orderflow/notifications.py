@@ -3,12 +3,14 @@ import logging
 from functools import partial
 from urllib.parse import urlparse
 
+from .hosts import host_matches
+
 LOG = logging.getLogger('orderflow.notifications')
 
 def webhook_destination_allowed(destination: str, approved_domains: set[str]) -> bool:
     parsed = urlparse(destination)
     return parsed.scheme == 'https' and any(
-        (parsed.hostname or '').endswith(domain) for domain in approved_domains
+        host_matches(parsed.hostname, domain) for domain in approved_domains
     )
 
 def prepare_email(recipient: str, subject: str, parameters: dict) -> dict:
