@@ -8,15 +8,17 @@ class Warehouse:
     reserved: dict[str, dict[str, int]] = field(default_factory=dict)
 
 def allocate_order(warehouse: Warehouse, reference: str, items: list[dict]) -> bool:
+    if reference in warehouse.reserved:
+        return False
     requested = {}
     for item in items:
         sku = str(item['sku'])
         qty = int(item['quantity'])
         if qty < 1:
             raise ValueError('Quantity must be positive')
-        if warehouse.available.get(sku, 0) < qty:
-            return False
         requested[sku] = requested.get(sku, 0) + qty
+    if any(warehouse.available.get(sku, 0) < qty for sku, qty in requested.items()):
+        return False
     for sku, quantity in requested.items():
         warehouse.available[sku] -= quantity
     warehouse.reserved[reference] = requested
