@@ -18,14 +18,20 @@ def sum_by_merchant(records: list[dict]) -> dict[int, int]:
 
 def reconcile(expected: list[dict], actual: list[dict]) -> list[dict]:
     """Find transactions with mismatched amounts."""
-    actual_by_ref = {row['reference']: row for row in actual}
+    actual_by_ref: dict[str, list[int]] = defaultdict(list)
+    for row in actual:
+        actual_by_ref[row['reference']].append(row['amount'])
     differences = []
     for item in expected:
-        match = actual_by_ref.get(item['reference'])
-        if match is None or match['amount'] != item['amount']:
+        amounts = actual_by_ref.pop(item['reference'], [])
+        received = sum(amounts) if amounts else None
+        if len(amounts) != 1 or received != item['amount']:
             differences.append({'reference': item['reference'],
                                 'expected': item['amount'],
-                                'actual': match['amount'] if match else None})
+                                'actual': received})
+    for reference, amounts in actual_by_ref.items():
+        differences.append({'reference': reference, 'expected': None,
+                            'actual': sum(amounts)})
     return differences
 
 def settlement_reference(merchant_id: int, day: str) -> str:
