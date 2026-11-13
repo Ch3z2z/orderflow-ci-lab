@@ -60,9 +60,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({ERROR_KEY: "Invalid input"}, 400)
 
 
+LISTEN_HOST = "127.0.0.1"
+LISTEN_PORT = 8765
+
+
 def main():
-    server = ThreadingHTTPServer(("127.0.0.1", 8765), Handler)
-    print("OrderFlow API: http://127.0.0.1:8765/health")
+    server = ThreadingHTTPServer((LISTEN_HOST, LISTEN_PORT), Handler)
+    print(f"OrderFlow API listening on {LISTEN_HOST}:{LISTEN_PORT} (health check: GET /health)")
     server.serve_forever()
 
 
