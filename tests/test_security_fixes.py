@@ -31,3 +31,22 @@ def test_owner_cannot_read_record_of_other_tenant():
     from orderflow.access import Principal, can_view_order
     user = Principal(4, "user", tenant_id=1)
     assert not can_view_order(user, {"owner_id": 4, "tenant_id": 2})
+
+
+def test_preferences_cannot_change_role_or_status():
+    import pytest
+    from orderflow.accounts import Account, update_preferences
+    account = Account(7, "user@example.test", "user")
+    with pytest.raises(PermissionError):
+        update_preferences(account, {"role": "admin", "active": True})
+    assert account.role == "user"
+    update_preferences(account, {"preferred_currency": "EUR"})
+    assert account.preferred_currency == "EUR"
+
+
+def test_api_key_comparison_is_exact():
+    from orderflow.accounts import verify_api_key
+    assert verify_api_key("k-123", "k-123")
+    assert not verify_api_key(" k-123 ", "k-123")
+    assert not verify_api_key("", "")
+    assert not verify_api_key("k-124", "k-123")
