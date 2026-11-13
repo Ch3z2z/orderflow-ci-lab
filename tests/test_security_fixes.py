@@ -50,3 +50,16 @@ def test_api_key_comparison_is_exact():
     assert not verify_api_key(" k-123 ", "k-123")
     assert not verify_api_key("", "")
     assert not verify_api_key("k-124", "k-123")
+
+
+def test_audit_log_redacts_sensitive_fields(caplog):
+    import logging
+    from orderflow.audit import record_operation
+    with caplog.at_level(logging.INFO, logger="orderflow.audit"):
+        event = record_operation("admin", "user.update",
+                                 {"user_id": 7, "password": "p@ss", "api_token": "t-1",
+                                  "contact": {"email": "a@test.local"}})
+    logged = caplog.text
+    assert "p@ss" not in logged and "t-1" not in logged and "a@test.local" not in logged
+    assert '"user_id": 7' in logged
+    assert event["attributes"]["password"] == "p@ss"
