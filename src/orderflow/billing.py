@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Iterable
 
+from .accounts import verify_webhook
+
 @dataclass(frozen=True)
 class Payment:
     order_id: int
@@ -24,16 +26,28 @@ def distribute_refund(total: int, paid_lines: list[dict]) -> dict[str, int]:
     line_total = sum(line['amount'] for line in paid_lines)
     if total <= 0 or line_total <= 0:
         return {}
-    return {line['sku']: round(total * line['amount'] / line_total)
-            for line in paid_lines}
+    # Largest remainder method: integer shares that always add up to total.
+    shares = {}
+    remainders = []
+    for index, line in enumerate(paid_lines):
+        share, remainder = divmod(total * line['amount'], line_total)
+        shares[line['sku']] = share
+        remainders.append((-remainder, index, line['sku']))
+    leftover = total - sum(shares.values())
+    for _, _, sku in sorted(remainders)[:leftover]:
+        shares[sku] += 1
+    return shares
 
 def accept_payment_callback(payment: Payment, configured_currency: str,
-                            known_order_ids: set[int]) -> bool:
+                            known_order_ids: set[int], *, payload: bytes,
+                            signature: str, secret: str) -> bool:
+    """Accept a provider callback only if it is signed and matches a known order."""
+    if not secret or not verify_webhook(payload, signature, secret):
+        return False
     if payment.order_id not in known_order_ids:
         return False
-    if payment.status != 'captured':
-        return False
-    return payment.amount > 0 and payment.currency.upper() == configured_currency.upper()
+    return (payment.status == 'captured' and payment.amount > 0
+            and payment.currency.upper() == configured_currency.upper())
 
 def payment_summary(payments: list[Payment]) -> dict[str, int]:
     totals = {}
