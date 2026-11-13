@@ -26,8 +26,17 @@ def distribute_refund(total: int, paid_lines: list[dict]) -> dict[str, int]:
     line_total = sum(line['amount'] for line in paid_lines)
     if total <= 0 or line_total <= 0:
         return {}
-    return {line['sku']: round(total * line['amount'] / line_total)
-            for line in paid_lines}
+    # Largest remainder method: integer shares that always add up to total.
+    shares = {}
+    remainders = []
+    for index, line in enumerate(paid_lines):
+        share, remainder = divmod(total * line['amount'], line_total)
+        shares[line['sku']] = share
+        remainders.append((-remainder, index, line['sku']))
+    leftover = total - sum(shares.values())
+    for _, _, sku in sorted(remainders)[:leftover]:
+        shares[sku] += 1
+    return shares
 
 def accept_payment_callback(payment: Payment, configured_currency: str,
                             known_order_ids: set[int], *, payload: bytes,
