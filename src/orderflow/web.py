@@ -11,6 +11,8 @@ from .storage import connect_database, find_orders_by_email
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("orderflow")
+ERROR_KEY = "error"
+UNKNOWN_RESOURCE = "Unknown resource"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -41,21 +43,21 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     found = find_orders_by_email(connection, email)
                 except sqlite3.DatabaseError:
-                    return self.send_json({"error": "Invalid search"}, 400)
+                    return self.send_json({ERROR_KEY: "Invalid search"}, 400)
             return self.send_json({"orders": found})
-        return self.send_json({"error": "Unknown resource"}, 404)
+        return self.send_json({ERROR_KEY: UNKNOWN_RESOURCE}, 404)
 
     def do_POST(self):
         if urlparse(self.path).path != "/api/quote":
-            return self.send_json({"error": "Unknown resource"}, 404)
+            return self.send_json({ERROR_KEY: UNKNOWN_RESOURCE}, 404)
         try:
             length = int(self.headers.get("Content-Length", "0"))
             payload = json.loads(self.rfile.read(length))
             LOGGER.info("Quote requested for %s items", len(payload.get("items", [])))
             total = calculate_total(payload["items"], payload.get("coupon", ""), bool(payload.get("loyalty", False)), bool(payload.get("express", False)), payload.get("region", "local"))
             return self.send_json({"total": total})
-        except (ValueError, KeyError, TypeError, json.JSONDecodeError):
-            return self.send_json({"error": "Invalid input"}, 400)
+        except (ValueError, KeyError, TypeError):  # JSONDecodeError is a ValueError
+            return self.send_json({ERROR_KEY: "Invalid input"}, 400)
 
 
 def main():

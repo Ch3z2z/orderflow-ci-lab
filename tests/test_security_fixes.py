@@ -126,3 +126,31 @@ def test_order_search_treats_email_as_data():
         save_order(conn, "b@test.local", 200)
         assert find_orders_by_email(conn, "x' OR '1'='1") == []
         assert len(find_orders_by_email(conn, "a@test.local")) == 1
+
+
+def test_quote_rejects_malformed_json():
+    import io
+    import json
+    from orderflow.web import Handler
+    body = b"{not json"
+    handler = Handler.__new__(Handler)
+    handler.path = "/api/quote"
+    handler.request_version = "HTTP/1.1"
+    handler.requestline = "POST /api/quote HTTP/1.1"
+    handler.command = "POST"
+    handler.headers = {"Content-Length": str(len(body))}
+    handler.rfile = io.BytesIO(body)
+    handler.wfile = io.BytesIO()
+    handler.log_message = lambda *args: None
+    handler.do_POST()
+    raw = handler.wfile.getvalue().decode("utf-8")
+    assert raw.split("\r\n", 1)[0].split()[1] == "400"
+    assert json.loads(raw.split("\r\n\r\n", 1)[1]) == {"error": "Invalid input"}
+
+
+def test_unknown_resource_returns_404():
+    import json
+    from orderflow.web import Handler
+    raw = _request(Handler, "/nope")
+    assert raw.split("\r\n", 1)[0].split()[1] == "404"
+    assert json.loads(raw.split("\r\n\r\n", 1)[1]) == {"error": "Unknown resource"}
